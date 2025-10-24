@@ -15,7 +15,7 @@ from accuralai_core.contracts.errors import AccuralAIError
 from accuralai_core.contracts.models import GenerateRequest, GenerateResponse
 from accuralai_core.core.orchestrator import CoreOrchestrator
 
-from .output import render_json, render_text
+from .output import render_json, render_text, render_compact, render_streaming_chunk, ResponseFormatter, ColorTheme, get_theme
 from .state import SessionState, create_default_state
 from .tools.registry import ToolRegistry
 from .tools.runner import ToolRunner
@@ -32,9 +32,10 @@ Writer = Callable[[str], None]
 
 BANNER = """\
 ╭──────────────── AccuralAI REPL ────────────────╮
-│ Codex-style shell for rapid LLM iteration.     │
-│ Type plain text to run a prompt.              │
-│ Use /help for commands, /exit to quit.        │
+│ Codex-style shell for rapid LLM iteration   │
+│ Type plain text to run a prompt               │
+│ Use /help for commands, /exit to quit         │
+│ Use /format compact for quick responses       │
 ╰───────────────────────────────────────────────╯
 """
 
@@ -48,13 +49,14 @@ COMMAND_HELP: Dict[str, str] = {
     "meta": "Manage metadata defaults: /meta set key=value, /meta clear <key>, /meta list",
     "params": "Manage parameter defaults (same syntax as /meta)",
     "history": "Toggle/view conversation history: /history on|off|show|clear",
-    "format": "Set response format: /format text|json",
+    "format": "Set response format: /format text|json|compact",
     "stream": "Toggle streaming flag (future backends): /stream on|off",
     "config": "Manage config paths: /config add <path>, /config list",
     "reset": "Reset session state (preserves config paths).",
     "save": "Persist session transcript/settings: /save <file>",
     "debug": "Toggle debug output: /debug on|off",
     "tool": "Manage tools: /tool list | /tool info <name> | /tool enable <name> | /tool run <name>",
+    "theme": "Manage theme settings: /theme list | /theme set <name> | /theme reset",
     "exit": "Exit the shell.",
 }
 
@@ -179,6 +181,7 @@ class InteractiveShell:
             "tool": self._cmd_tool,
             "t": self._cmd_tool,
             "tools": self._cmd_tool,
+            "theme": self._cmd_theme,
         }
 
         handler = handler_map.get(command)
@@ -188,10 +191,36 @@ class InteractiveShell:
         handler(args)
 
     def _writer_json(self, response: GenerateResponse) -> None:
+        theme_name = getattr(self.state, 'theme', 'default')
         if self.state.response_format == "json":
             self._writer(render_json(response))
+        elif self.state.response_format == "compact":
+            self._writer(render_compact(response, theme_name))
         else:
-            self._writer(render_text(response))
+            self._writer(render_text(response, theme_name))
+    
+    def _show_progress(self, message: str = "Processing...") -> None:
+        """Show a progress indicator."""
+        theme_name = getattr(self.state, 'theme', 'default')
+        formatter = ResponseFormatter(theme_name=theme_name)
+        progress_text = formatter.theme.colorize(f"{message}", formatter.theme.CYAN)
+        self._writer(progress_text)
+    
+    def _show_streaming_header(self, response: GenerateResponse) -> None:
+        """Show streaming response header."""
+        theme_name = getattr(self.state, 'theme', 'default')
+        formatter = ResponseFormatter(theme_name=theme_name)
+        metadata_bar = formatter.format_metadata_bar(response)
+        
+        # Create a streaming header
+        header_lines = [
+            "┌─ Streaming Response ───────────────────────────────────────────────────┐",
+            f"│ {metadata_bar:<75} │",
+            "└─────────────────────────────────────────────────────────────────────────┘"
+        ]
+        
+        self._writer("\n".join(header_lines))
+        self._writer("")  # Empty line
 
     # ---------------------------------------------------------------- commands impl
     def _cmd_help(self, args: List[str]) -> None:
@@ -343,11 +372,11 @@ class InteractiveShell:
             self._writer(f"Response format: {self.state.response_format}")
             return
         choice = args[0].lower()
-        if choice in {"text", "json"}:
+        if choice in {"text", "json", "compact"}:
             self.state.response_format = choice
             self._writer(f"Response format set to {choice}.")
         else:
-            self._writer("Unsupported format. Use /format text|json.")
+            self._writer("Unsupported format. Use /format text|json|compact.")
 
     def _cmd_stream(self, args: List[str]) -> None:
         if not args:
@@ -503,17 +532,65 @@ class InteractiveShell:
 
         self._writer("Usage: /tool list | /tool info <name> | /tool run <name> [args...] | /tool reload | /tool enable <name> | /tool disable <name>")
 
+    def _cmd_theme(self, args: List[str]) -> None:
+        """Manage theme settings."""
+        if not args:
+            self._writer("Usage: /theme list | /theme set <name> | /theme reset")
+            return
+        
+        action = args[0].lower()
+        
+        if action == "list":
+            themes = ["default", "monochrome", "high-contrast", "pastel"]
+            self._writer("Available themes:")
+            for theme in themes:
+                current = " (current)" if getattr(self.state, 'theme', 'default') == theme else ""
+                self._writer(f"  - {theme}{current}")
+            return
+        
+        elif action == "set" and len(args) >= 2:
+            theme_name = args[1]
+            if not hasattr(self.state, 'theme'):
+                self.state.theme = 'default'
+            
+            if theme_name in ["default", "monochrome", "high-contrast", "pastel"]:
+                self.state.theme = theme_name
+                self._writer(f"Theme set to '{theme_name}'.")
+            else:
+                self._writer(f"Unknown theme '{theme_name}'. Use /theme list to see available themes.")
+            return
+        
+        elif action == "reset":
+            if hasattr(self.state, 'theme'):
+                self.state.theme = 'default'
+            self._writer("Theme reset to default.")
+            return
+        
+        else:
+            self._writer("Usage: /theme list | /theme set <name> | /theme reset")
+
     # ---------------------------------------------------------------- prompt submit
     def _submit_prompt(self, prompt_text: str) -> None:
         if not prompt_text:
             self._writer("(empty prompt ignored)")
             return
+        
+        # Show progress indicator
+        self._show_progress("Generating response...")
+        
         try:
             response = anyio.run(self._conversation_loop, prompt_text)
         except AccuralAIError as error:
-            self._writer(f"[pipeline error] {error}")
+            theme_name = getattr(self.state, 'theme', 'default')
+            formatter = ResponseFormatter(theme_name=theme_name)
+            error_text = formatter.theme.colorize(f"Pipeline error: {error}", formatter.theme.RED)
+            self._writer(error_text)
             if self.state.debug and error.stage_context:
-                self._writer(f"  stage={error.stage_context.stage} plugin={error.stage_context.plugin_id}")
+                debug_info = formatter.theme.colorize(
+                    f"  stage={error.stage_context.stage} plugin={error.stage_context.plugin_id}", 
+                    formatter.theme.GRAY
+                )
+                self._writer(debug_info)
             return
 
         if response is not None:
@@ -521,7 +598,7 @@ class InteractiveShell:
 
     async def _conversation_loop(self, prompt_text: str) -> Optional[GenerateResponse]:
         orchestrator = await self._ensure_orchestrator()
-        base_conversation = list(self.state.conversation) if self.state.history_enabled else []
+        base_conversation = list(self.state.conversation)
         conversation = list(base_conversation)
         user_added = False
         pending_prompt = prompt_text
@@ -577,10 +654,7 @@ class InteractiveShell:
             conversation.append({"role": "assistant", "content": response.output_text})
             break
 
-        if self.state.history_enabled:
-            self.state.conversation = conversation
-        else:
-            self.state.conversation = []
+        self.state.conversation = conversation
 
         if self.state.history_enabled and final_response is not None:
             self.state.history.append({"role": "user", "content": prompt_text})

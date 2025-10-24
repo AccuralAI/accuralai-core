@@ -159,6 +159,9 @@ class Pipeline:
         )
 
         final_response = await self._run_post_processors(ctx, validated, canonical)
+        if final_response.request_id != ctx.request.id:
+            final_response = final_response.model_copy(update={"request_id": ctx.request.id})
+
         ctx.response = final_response
         return final_response
 

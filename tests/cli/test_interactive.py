@@ -88,7 +88,7 @@ def test_tool_function_call_loop(monkeypatch, tmp_path):
     response_tool = GenerateResponse(
         id=uuid4(),
         request_id=uuid4(),
-        output_text="",
+        output_text="[tool-call]",
         finish_reason="stop",
         usage=Usage(prompt_tokens=1, completion_tokens=0, total_tokens=1),
         latency_ms=0,
@@ -157,18 +157,30 @@ def test_interactive_history_toggle_and_prompt(monkeypatch):
     shell = build_shell(outputs)
     shell.execute_line("/history on")
 
-    async def fake_generate(prompt_text: str):
-        request = GenerateRequest(prompt=prompt_text)
-        return make_response(request, text=f"echo:{prompt_text}")
+    class DummyOrchestrator:
+        async def generate(self, request: GenerateRequest):
+            return make_response(request, text=f"echo:{request.prompt}")
 
-    monkeypatch.setattr(shell, "_generate", fake_generate)
+        async def aclose(self):
+            pass
+
+    dummy_orchestrator = DummyOrchestrator()
+
+    async def fake_ensure_orchestrator():
+        return dummy_orchestrator
+
+    monkeypatch.setattr(shell, "_ensure_orchestrator", fake_ensure_orchestrator)
 
     shell.execute_line("Hello shell")
 
-    assert "History capture enabled." in outputs[0]
-    assert "echo:Hello shell" in outputs[-1]
+    assert any("History capture enabled." in line for line in outputs)
+    assert any("echo:Hello shell" in line for line in outputs)
     assert shell.state.history_enabled is True
-    assert shell.state.history[-1]["role"] == "assistant"
+    assert len(shell.state.history) == 2
+    assert shell.state.history[0]["role"] == "user"
+    assert shell.state.history[0]["content"] == "Hello shell"
+    assert shell.state.history[1]["role"] == "assistant"
+    assert shell.state.history[1]["content"] == "echo:Hello shell"
 
 
 def test_interactive_save(tmp_path):
@@ -187,11 +199,11 @@ def test_interactive_multiline_prompt(monkeypatch):
     outputs: List[str] = []
     shell = build_shell(outputs)
 
-    async def fake_generate(prompt_text: str):
+    async def fake_loop(prompt_text: str):
         request = GenerateRequest(prompt=prompt_text)
         return make_response(request, text=prompt_text.upper())
 
-    monkeypatch.setattr(shell, "_generate", fake_generate)
+    monkeypatch.setattr(shell, "_conversation_loop", fake_loop)
     monkeypatch.setattr(shell, "_readline", lambda primary: '"""')
 
     combined = shell._collect_multiline('"""')
@@ -200,4 +212,4 @@ def test_interactive_multiline_prompt(monkeypatch):
     # Execute multi-line prompt via direct method calls.
     shell.execute_line('"""')
 
-    assert "(empty prompt ignored)" in outputs[-1]
+    assert any("(empty prompt ignored)" in line for line in outputs)

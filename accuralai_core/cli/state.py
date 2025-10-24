@@ -5,6 +5,14 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
+# Import version from package metadata
+try:
+    from importlib.metadata import version
+    ACCURALAI_CORE_VERSION = version("accuralai-core")
+except Exception:
+    # Fallback if importlib.metadata is not available or package not installed
+    ACCURALAI_CORE_VERSION = "Unknown"
+
 
 @dataclass(slots=True)
 class SessionState:
@@ -26,6 +34,8 @@ class SessionState:
     tool_defs: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     tool_functions: Dict[str, str] = field(default_factory=dict)
     conversation: List[Dict[str, Any]] = field(default_factory=list)
+    theme: str = "default"
+    version: str = field(default_factory=lambda: ACCURALAI_CORE_VERSION)
 
     def reset(self) -> None:
         """Reset non-configurable session preferences to defaults."""
@@ -43,6 +53,7 @@ class SessionState:
         self.tool_defs.clear()
         self.tool_functions.clear()
         self.conversation.clear()
+        self.theme = "default"
 
     def to_serializable(self) -> Dict[str, Any]:
         """Return JSON-serializable snapshot of the session."""
@@ -63,6 +74,8 @@ class SessionState:
             "tools": self.tool_defs,
             "tool_functions": dict(self.tool_functions),
             "conversation": list(self.conversation),
+            "theme": self.theme,
+            "version": self.version,
         }
 
 
