@@ -162,6 +162,13 @@ class Pipeline:
         if final_response.request_id != ctx.request.id:
             final_response = final_response.model_copy(update={"request_id": ctx.request.id})
 
+        # Add cache status to response metadata
+        cache_status = "hit" if cached_response else "miss" if cache_key and self._cache else "disabled"
+        final_response.metadata["cache_status"] = cache_status
+        final_response.metadata["response_source"] = response_source
+        if cache_key:
+            final_response.metadata["cache_key"] = cache_key
+
         ctx.response = final_response
         return final_response
 

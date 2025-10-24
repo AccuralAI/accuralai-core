@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
-from .schema import BackendSettings, CacheSettings, CoreSettings, RouterSettings
+from .schema import BackendSettings, CacheSettings, CoreSettings, RouterSettings, ToolSettings
 
 
 def get_default_settings() -> CoreSettings:
@@ -39,6 +39,28 @@ def get_default_settings() -> CoreSettings:
         "backends": {"mock": BackendSettings(plugin="mock").model_dump()},
         "validators": [],
         "post_processors": [],
+        "tools": ToolSettings(
+            enabled_by_default=[
+                "read.file",
+                "write.file", 
+                "list.directory",
+                "search.files",
+                "grep.text",
+                "file.info",
+                "get.working_directory",
+                "path.exists"
+            ],
+            disabled_by_default=[
+                "run.command",
+                "delete.file",
+                "copy.file",
+                "move.file",
+                "create.directory",
+                "change.working_directory",
+                "get.environment_variables"
+            ],
+            auto_enable=False
+        ).model_dump(),
     }
     return CoreSettings.model_validate(defaults)
 

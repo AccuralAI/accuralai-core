@@ -47,6 +47,14 @@ class PostProcessorSettings(PluginSettings):
     id: Optional[str] = None
 
 
+class ToolSettings(BaseModel):
+    """Tool configuration settings."""
+
+    enabled_by_default: List[str] = Field(default_factory=list)
+    disabled_by_default: List[str] = Field(default_factory=list)
+    auto_enable: bool = Field(default=False)
+
+
 class InstrumentationSettings(BaseModel):
     """Settings controlling instrumentation behaviour."""
 
@@ -62,6 +70,7 @@ class CoreSettings(BaseSettings):
     backends: Dict[str, BackendSettings] = Field(default_factory=dict)
     validators: List[ValidatorSettings] = Field(default_factory=list)
     post_processors: List[PostProcessorSettings] = Field(default_factory=list)
+    tools: ToolSettings = Field(default_factory=ToolSettings)
     instrumentation: InstrumentationSettings = Field(default_factory=InstrumentationSettings)
 
     model_config = {"env_prefix": "COMPOUNDAI_CORE__"}

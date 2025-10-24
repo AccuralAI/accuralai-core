@@ -118,6 +118,18 @@ class ResponseFormatter:
         status = self.theme.colorize(f"● {response.finish_reason}", status_color)
         parts.append(status)
         
+        # Cache status
+        cache_status = response.metadata.get("cache_status", "unknown")
+        if cache_status == "hit":
+            cache_display = self.theme.colorize("Cache: HIT", self.theme.GREEN)
+        elif cache_status == "miss":
+            cache_display = self.theme.colorize("Cache: MISS", self.theme.YELLOW)
+        elif cache_status == "disabled":
+            cache_display = self.theme.colorize("Cache: OFF", self.theme.GRAY)
+        else:
+            cache_display = self.theme.colorize("Cache: ?", self.theme.GRAY)
+        parts.append(cache_display)
+        
         # Latency
         latency = self.theme.colorize(f"Latency: {response.latency_ms}ms", self.theme.CYAN)
         parts.append(latency)

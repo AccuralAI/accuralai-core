@@ -14,6 +14,7 @@ import click
 from accuralai_core.contracts.errors import AccuralAIError
 from accuralai_core.contracts.models import GenerateRequest, GenerateResponse
 from accuralai_core.core.orchestrator import CoreOrchestrator
+from accuralai_core.config.loader import load_settings
 
 from .output import render_json, render_text, render_compact, render_streaming_chunk, ResponseFormatter, ColorTheme, get_theme
 from .state import SessionState, create_default_state
@@ -82,6 +83,9 @@ class InteractiveShell:
         if PromptSession is not None and self._can_use_prompt_toolkit():
             history = InMemoryHistory() if InMemoryHistory else None
             self._prompt_session = PromptSession(history=history)
+        
+        # Load tool configuration from settings
+        self._load_tool_configuration()
 
     # --------------------------------------------------------------------- run loop
     def run(self) -> None:
@@ -153,6 +157,42 @@ class InteractiveShell:
             return bool(os.isatty(0) and os.isatty(1))
         except Exception:  # pragma: no cover - best effort
             return False
+
+    def _load_tool_configuration(self) -> None:
+        """Load tool configuration from settings and enable/disable tools accordingly."""
+        try:
+            # Load settings from config paths
+            settings = load_settings(
+                config_paths=self.state.config_paths,
+                overrides=self.state.config_overrides
+            )
+            
+            tool_config = settings.tools
+            
+            # Enable tools specified in enabled_by_default
+            for tool_name in tool_config.enabled_by_default:
+                spec = self._tool_registry.get(tool_name)
+                if spec and spec.function:
+                    func_name = spec.function.get("name") or spec.name
+                    self.state.tool_defs[func_name] = dict(spec.function)
+                    self.state.tool_functions[func_name] = spec.name
+                    self.state.tools_version += 1
+            
+            # If auto_enable is True, enable all available tools except those in disabled_by_default
+            if tool_config.auto_enable:
+                for spec in self._tool_registry.list_tools():
+                    if spec.name not in tool_config.disabled_by_default and spec.function:
+                        func_name = spec.function.get("name") or spec.name
+                        if func_name not in self.state.tool_defs:  # Don't override already enabled tools
+                            self.state.tool_defs[func_name] = dict(spec.function)
+                            self.state.tool_functions[func_name] = spec.name
+                            self.state.tools_version += 1
+            
+        except Exception as e:
+            # If there's an error loading config, just continue without tool configuration
+            # This ensures the CLI still works even with malformed config
+            if self.state.debug:
+                self._writer(f"Warning: Could not load tool configuration: {e}")
 
     def _handle_command(self, command_line: str) -> None:
         parts = shlex.split(command_line, posix=os.name != "nt")
@@ -693,7 +733,11 @@ class InteractiveShell:
         prefix = "[tool]" if result.status == "success" else "[tool error]"
         self._writer(f"{prefix} {name} → {result.message}")
 
-        content = result.data if result.data is not None else {"message": result.message}
+        if result.status == "success":
+            content = result.message
+        else:
+            content = result.data if result.data is not None else {"message": result.message}
+        
         return {
             "name": name,
             "status": result.status,
