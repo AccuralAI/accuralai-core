@@ -84,25 +84,42 @@ class Pipeline:
             ctx.request,
         )
 
+        if canonical.id != ctx.request.id:
+            canonical = canonical.model_copy(update={"id": ctx.request.id})
+
         ctx.canonical_request = canonical
 
         cache_key = self._cache_strategy(canonical)
         cached_response: Optional[GenerateResponse] = None
+        cache_latency_ms: Optional[int] = None
         if cache_key and self._cache:
+            async def measured_cache_get(key: str, *, request: GenerateRequest) -> GenerateResponse | None:
+                nonlocal cache_latency_ms
+                async with measure_latency() as tracker:
+                    result = await self._cache.get(key, request=request)
+                cache_latency_ms = tracker.elapsed_ms
+                return result
+
             cached_response = await self._run_stage(
                 "cache.get",
                 ctx,
-                self._cache.get,
+                measured_cache_get,
                 cache_key,
                 request=canonical,
             )
             if cached_response:
+                latency_ms = cache_latency_ms or 0
+                if cached_response.latency_ms != latency_ms:
+                    cached_response = cached_response.model_copy(update={"latency_ms": latency_ms})
                 await ctx.record_event(
                     CACHE_HIT,
-                    {"cache_key": cache_key, "backend": "cache"},
+                    {"cache_key": cache_key, "backend": "cache", "latency_ms": latency_ms},
                 )
         if not cached_response and cache_key and self._cache:
-            await ctx.record_event(CACHE_MISS, {"cache_key": cache_key})
+            await ctx.record_event(
+                CACHE_MISS,
+                {"cache_key": cache_key, "latency_ms": cache_latency_ms or 0},
+            )
 
         response_source = "cache" if cached_response else "backend"
 

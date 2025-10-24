@@ -32,3 +32,13 @@ pip install accuralai-cache
 With caching enabled, repeat invocations are served instantly until the configured TTL expires.
 
 See `plan/accuralai-core-spec.md` for the full architectural specification guiding implementation.
+
+## Interactive CLI
+
+Launch the Codex-style REPL by invoking `accuralai` (or `accuralai-cli`) with no subcommand:
+
+```bash
+accuralai --config ~/.accuralai/core.toml
+```
+
+The shell remains active until `/exit`, and supports `/` commands for adjusting settings on the fly (`/help`, `/backend`, `/model`, `/meta`, `/history`, `/save`, `/tool ...`, etc.). Plain text input triggers pipeline runs using the current session defaults, and multi-line prompts are accepted by entering `"""` on an empty line. Tools can be listed via `/tool list`, executed manually with `/tool run ...`, and made available to the model for function calling via `/tool enable <name>`.

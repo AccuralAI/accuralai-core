@@ -42,13 +42,15 @@ class GenerateRequest(BaseModel):
     cache_key: Optional[str] = None
     route_hint: Optional[str] = None
     tags: List[str] = Field(default_factory=list)
+    tools: List[Dict[str, Any]] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def _validate_prompt(cls, request: "GenerateRequest") -> "GenerateRequest":
         """Guarantee prompts are provided."""
         if not request.prompt or not request.prompt.strip():
-            msg = "GenerateRequest.prompt must be a non-empty string"
-            raise ValueError(msg)
+            if not request.history:
+                msg = "GenerateRequest.prompt must be a non-empty string"
+                raise ValueError(msg)
         return request
 
 
