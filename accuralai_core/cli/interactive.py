@@ -57,7 +57,6 @@ COMMAND_HELP: Dict[str, str] = {
     "save": "Persist session transcript/settings: /save <file>",
     "debug": "Toggle debug output: /debug on|off",
     "tool": "Manage tools: /tool list | /tool info <name> | /tool enable <name> | /tool run <name>",
-    "theme": "Manage theme settings: /theme list | /theme set <name> | /theme reset",
     "exit": "Exit the shell.",
 }
 
@@ -221,7 +220,6 @@ class InteractiveShell:
             "tool": self._cmd_tool,
             "t": self._cmd_tool,
             "tools": self._cmd_tool,
-            "theme": self._cmd_theme,
         }
 
         handler = handler_map.get(command)
@@ -231,25 +229,20 @@ class InteractiveShell:
         handler(args)
 
     def _writer_json(self, response: GenerateResponse) -> None:
-        theme_name = getattr(self.state, 'theme', 'default')
         if self.state.response_format == "json":
             self._writer(render_json(response))
         elif self.state.response_format == "compact":
-            self._writer(render_compact(response, theme_name))
+            self._writer(render_compact(response))
         else:
-            self._writer(render_text(response, theme_name))
+            self._writer(render_text(response))
     
     def _show_progress(self, message: str = "Processing...") -> None:
         """Show a progress indicator."""
-        theme_name = getattr(self.state, 'theme', 'default')
-        formatter = ResponseFormatter(theme_name=theme_name)
-        progress_text = formatter.theme.colorize(f"{message}", formatter.theme.CYAN)
-        self._writer(progress_text)
+        self._writer(f"{message}")
     
     def _show_streaming_header(self, response: GenerateResponse) -> None:
         """Show streaming response header."""
-        theme_name = getattr(self.state, 'theme', 'default')
-        formatter = ResponseFormatter(theme_name=theme_name)
+        formatter = ResponseFormatter()
         metadata_bar = formatter.format_metadata_bar(response)
         
         # Create a streaming header
@@ -284,8 +277,21 @@ class InteractiveShell:
 
     def _cmd_backend(self, args: List[str]) -> None:
         if not args:
-            value = self.state.route_hint or "(none)"
-            self._writer(f"Current backend hint: {value}")
+            current_value = self.state.route_hint or "(none)"
+            self._writer(f"Current backend hint: {current_value}")
+            
+            # Show available backends from config
+            config = self._load_current_config()
+            if config and "backends" in config:
+                backends = list(config["backends"].keys())
+                if backends:
+                    self._writer("Available backends:")
+                    for backend_id in backends:
+                        backend_config = config["backends"][backend_id]
+                        plugin_info = f" ({backend_config.get('plugin', 'unknown')})"
+                        self._writer(f"  {backend_id}{plugin_info}")
+                else:
+                    self._writer("No backends configured")
             return
         arg = args[0].lower()
         if arg == "reset":
@@ -297,8 +303,23 @@ class InteractiveShell:
 
     def _cmd_model(self, args: List[str]) -> None:
         if not args:
-            value = self.state.parameters.get("model", "(none)")
-            self._writer(f"Current model: {value}")
+            current_value = self.state.parameters.get("model", "(none)")
+            self._writer(f"Current model: {current_value}")
+            
+            # Show default model from config
+            config = self._load_current_config()
+            if config and "backends" in config:
+                default_models = []
+                for backend_id, backend_config in config["backends"].items():
+                    if backend_config.get("options", {}).get("model"):
+                        default_models.append(f"{backend_id}: {backend_config['options']['model']}")
+                
+                if default_models:
+                    self._writer("Available default models:")
+                    for model in default_models:
+                        self._writer(f"  {model}")
+                else:
+                    self._writer("No default models configured")
             return
         option = args[0]
         if option.lower() == "reset":
@@ -312,8 +333,19 @@ class InteractiveShell:
     def _cmd_router(self, args: List[str]) -> None:
         # Router hints stored in metadata (e.g., metadata["router_hint"])
         if not args:
-            value = self.state.metadata.get("router_hint")
-            self._writer(f"Current router hint: {value or '(none)'}")
+            current_value = self.state.metadata.get("router_hint")
+            self._writer(f"Current router hint: {current_value or '(none)'}")
+            
+            # Show default router from config
+            config = self._load_current_config()
+            if config and "router" in config:
+                router_config = config["router"]
+                if router_config.get("plugin"):
+                    self._writer(f"Default router: {router_config['plugin']}")
+                    if router_config.get("default_backend"):
+                        self._writer(f"Default backend: {router_config['default_backend']}")
+                else:
+                    self._writer("No default router configured")
             return
         if args[0].lower() == "reset":
             self.state.metadata.pop("router_hint", None)
@@ -435,8 +467,48 @@ class InteractiveShell:
             if not self.state.config_paths:
                 self._writer("No config paths supplied.")
             else:
+                self._writer("Config paths:")
                 for path in self.state.config_paths:
-                    self._writer(f"- {path}")
+                    self._writer(f"  {path}")
+            
+            # Show current configuration summary
+            config = self._load_current_config()
+            if config:
+                self._writer("\nCurrent configuration:")
+                
+                # Canonicalizer
+                if "canonicalizer" in config:
+                    canonicalizer = config["canonicalizer"]
+                    self._writer(f"  Canonicalizer: {canonicalizer.get('plugin', 'none')}")
+                
+                # Cache
+                if "cache" in config:
+                    cache = config["cache"]
+                    self._writer(f"  Cache: {cache.get('plugin', 'none')}")
+                    if cache.get("ttl_s"):
+                        self._writer(f"    TTL: {cache['ttl_s']}s")
+                
+                # Router
+                if "router" in config:
+                    router = config["router"]
+                    self._writer(f"  Router: {router.get('plugin', 'none')}")
+                    if router.get("default_backend"):
+                        self._writer(f"    Default backend: {router['default_backend']}")
+                
+                # Backends
+                if "backends" in config and config["backends"]:
+                    self._writer("  Backends:")
+                    for backend_id, backend_config in config["backends"].items():
+                        plugin = backend_config.get("plugin", "unknown")
+                        model = backend_config.get("options", {}).get("model", "none")
+                        self._writer(f"    {backend_id}: {plugin} (model: {model})")
+                
+                # Tools
+                if "tools" in config:
+                    tools = config["tools"]
+                    enabled_count = len(tools.get("enabled_by_default", []))
+                    disabled_count = len(tools.get("disabled_by_default", []))
+                    self._writer(f"  Tools: {enabled_count} enabled by default, {disabled_count} disabled by default")
             return
         action = args[0].lower()
         if action != "add" or len(args) < 2:
@@ -572,43 +644,6 @@ class InteractiveShell:
 
         self._writer("Usage: /tool list | /tool info <name> | /tool run <name> [args...] | /tool reload | /tool enable <name> | /tool disable <name>")
 
-    def _cmd_theme(self, args: List[str]) -> None:
-        """Manage theme settings."""
-        if not args:
-            self._writer("Usage: /theme list | /theme set <name> | /theme reset")
-            return
-        
-        action = args[0].lower()
-        
-        if action == "list":
-            themes = ["default", "monochrome", "high-contrast", "pastel"]
-            self._writer("Available themes:")
-            for theme in themes:
-                current = " (current)" if getattr(self.state, 'theme', 'default') == theme else ""
-                self._writer(f"  - {theme}{current}")
-            return
-        
-        elif action == "set" and len(args) >= 2:
-            theme_name = args[1]
-            if not hasattr(self.state, 'theme'):
-                self.state.theme = 'default'
-            
-            if theme_name in ["default", "monochrome", "high-contrast", "pastel"]:
-                self.state.theme = theme_name
-                self._writer(f"Theme set to '{theme_name}'.")
-            else:
-                self._writer(f"Unknown theme '{theme_name}'. Use /theme list to see available themes.")
-            return
-        
-        elif action == "reset":
-            if hasattr(self.state, 'theme'):
-                self.state.theme = 'default'
-            self._writer("Theme reset to default.")
-            return
-        
-        else:
-            self._writer("Usage: /theme list | /theme set <name> | /theme reset")
-
     # ---------------------------------------------------------------- prompt submit
     def _submit_prompt(self, prompt_text: str) -> None:
         if not prompt_text:
@@ -621,16 +656,9 @@ class InteractiveShell:
         try:
             response = anyio.run(self._conversation_loop, prompt_text)
         except AccuralAIError as error:
-            theme_name = getattr(self.state, 'theme', 'default')
-            formatter = ResponseFormatter(theme_name=theme_name)
-            error_text = formatter.theme.colorize(f"Pipeline error: {error}", formatter.theme.RED)
-            self._writer(error_text)
+            self._writer(f"Pipeline error: {error}")
             if self.state.debug and error.stage_context:
-                debug_info = formatter.theme.colorize(
-                    f"  stage={error.stage_context.stage} plugin={error.stage_context.plugin_id}", 
-                    formatter.theme.GRAY
-                )
-                self._writer(debug_info)
+                self._writer(f"  stage={error.stage_context.stage} plugin={error.stage_context.plugin_id}")
             return
 
         if response is not None:
@@ -756,6 +784,20 @@ class InteractiveShell:
         if self._orchestrator:
             anyio.run(self._orchestrator.aclose)
         self._orchestrator = None
+
+    def _load_current_config(self) -> Optional[Dict[str, Any]]:
+        """Load the current configuration settings."""
+        try:
+            if self.state.config_paths:
+                config = load_settings(config_paths=self.state.config_paths)
+            else:
+                from accuralai_core.config.defaults import get_default_settings
+                config = get_default_settings()
+            return config.model_dump()
+        except Exception as e:
+            if self.state.debug:
+                self._writer(f"Failed to load config: {e}")
+            return None
 
     # ---------------------------------------------------------------- utilities
     @staticmethod
