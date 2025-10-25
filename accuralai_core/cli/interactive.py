@@ -32,8 +32,8 @@ except ImportError:  # pragma: no cover - fallback when prompt_toolkit absent
 Writer = Callable[[str], None]
 
 BANNER = """\
-╭──────────────── AccuralAI REPL ────────────────╮
-│ Codex-style shell for rapid LLM iteration   │
+╭──────────────── AccuralAI REPL ───────────────╮
+│ Codex-style shell for rapid LLM iteration     │
 │ Type plain text to run a prompt               │
 │ Use /help for commands, /exit to quit         │
 │ Use /format compact for quick responses       │
