@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List, Optional, Sequence, Tuple
+from typing import List, Sequence, Tuple
 
 from ..config.schema import ValidatorSettings
 from ..contracts.errors import ValidationError, raise_with_context

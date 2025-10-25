@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import inspect
 from collections import defaultdict
-from typing import Any, Dict, Iterable, List, Mapping, MutableMapping
+from typing import Any, Dict, Iterable, List, MutableMapping
 
 from .discovery import discover_entry_points
 from .specs import PluginSpec

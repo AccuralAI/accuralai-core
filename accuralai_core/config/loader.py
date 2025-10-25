@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict, Iterable, Mapping, MutableMapping, Optional
+from typing import Any, Dict, Iterable, Mapping, MutableMapping
 
 from ..contracts.errors import ConfigurationError
 from .schema import CoreSettings
@@ -36,7 +36,7 @@ def load_from_file(path: str | Path) -> Dict[str, Any]:
 
     try:
         import tomllib  # type: ignore[import-not-found]
-    except ModuleNotFoundError as error:  # pragma: no cover - Python <3.11 w/out tomli
+    except ModuleNotFoundError:  # pragma: no cover - Python <3.11 w/out tomli
         try:
             import tomli as tomllib  # type: ignore[no-redef]
         except ModuleNotFoundError as fallback_error:

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable, Dict, Iterable, Mapping, Optional, Sequence
+from typing import Callable, Dict, Mapping, Optional, Sequence
 
 from ..contracts.errors import raise_with_context
 from ..contracts.models import GenerateRequest, GenerateResponse

@@ -7,7 +7,7 @@ import pkgutil
 from importlib.metadata import entry_points
 from typing import Dict, Iterable
 
-from .models import ToolHandler, ToolResult, ToolSpec
+from .models import ToolSpec
 
 
 class ToolRegistry:

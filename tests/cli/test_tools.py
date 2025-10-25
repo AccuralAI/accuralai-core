@@ -1,6 +1,5 @@
 from typing import List
 
-import pytest
 
 from accuralai_core.cli.interactive import InteractiveShell
 from accuralai_core.cli.state import create_default_state

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Awaitable, Callable, List, Protocol, TYPE_CHECKING
+from typing import Awaitable, Callable, List, TYPE_CHECKING
 
 if TYPE_CHECKING:  # pragma: no cover
     from .orchestrator import CoreOrchestrator

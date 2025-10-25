@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List, Optional, Sequence, Tuple
+from typing import List, Sequence
 
 from ..config.schema import PostProcessorSettings
 from ..contracts.errors import PipelineError, raise_with_context

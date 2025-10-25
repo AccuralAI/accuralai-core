@@ -2,7 +2,6 @@ import json
 from typing import List
 from uuid import uuid4
 
-import pytest
 
 from accuralai_core.cli.interactive import InteractiveShell
 from accuralai_core.cli.state import create_default_state

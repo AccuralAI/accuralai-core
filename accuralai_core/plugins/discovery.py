@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from importlib import metadata
-from typing import Iterable, List
+from typing import List
 
 from .specs import PluginSpec
 

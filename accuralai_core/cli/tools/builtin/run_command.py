@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import shlex
-import subprocess
 from typing import List
 
 from ...state import SessionState
