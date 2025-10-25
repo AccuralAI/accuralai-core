@@ -48,7 +48,7 @@ def test_interactive_model_command():
     assert shell.state.parameters.get("model") is None
     assert "Model set" in outputs[0]
     assert "gemini-1.5-flash" in outputs[1]
-    assert "Cleared model" in outputs[2]
+    assert "Cleared model" in outputs[3]
 
 
 def test_interactive_tool_commands(tmp_path):

@@ -324,7 +324,7 @@ class InteractiveShell:
         option = args[0]
         if option.lower() == "reset":
             self.state.parameters.pop("model", None)
-            self._writer("Cleared model override.")
+            self._writer("Cleared model.")
             return
 
         self.state.parameters["model"] = option
