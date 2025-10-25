@@ -115,7 +115,7 @@ class ResponseFormatter:
         
         # Status indicator
         status_color = self.theme.GREEN if response.finish_reason == "stop" else self.theme.YELLOW
-        status = self.theme.colorize(f"● {response.finish_reason}", status_color)
+        status = self.theme.colorize(f"* {response.finish_reason}", status_color)
         parts.append(status)
         
         # Cache status
@@ -129,6 +129,36 @@ class ResponseFormatter:
         else:
             cache_display = self.theme.colorize("Cache: ?", self.theme.GRAY)
         parts.append(cache_display)
+        
+        # Token savings from canonicalization
+        canonicalize_metrics = response.metadata.get("canonicalize_metrics", {})
+        cache_status = response.metadata.get("cache_status", "unknown")
+        
+        if cache_status == "hit":
+            # For cache hits, show both canonicalizer savings and cache savings
+            canonicalize_savings = canonicalize_metrics.get("tokens_saved", 0)
+            total_tokens = response.usage.total_tokens if response.usage else 0
+            
+            if canonicalize_savings > 0:
+                savings_display = self.theme.colorize(
+                    f"Saved: {canonicalize_savings} tokens (canonicalizer) + {total_tokens} tokens (cache hit)", 
+                    self.theme.GREEN
+                )
+            else:
+                savings_display = self.theme.colorize(
+                    f"Saved: {total_tokens} tokens (cache hit)", 
+                    self.theme.GREEN
+                )
+            parts.append(savings_display)
+        elif canonicalize_metrics.get("tokens_saved", 0) > 0:
+            # For cache misses, show only canonicalizer savings
+            tokens_saved = canonicalize_metrics["tokens_saved"]
+            compression_ratio = canonicalize_metrics.get("compression_ratio", 0)
+            savings_display = self.theme.colorize(
+                f"Saved: {tokens_saved} tokens ({compression_ratio:.1%})", 
+                self.theme.GREEN
+            )
+            parts.append(savings_display)
         
         # Latency
         latency = self.theme.colorize(f"Latency: {response.latency_ms}ms", self.theme.CYAN)
@@ -144,7 +174,7 @@ class ResponseFormatter:
             route = self.theme.colorize(f"{response.route_info}", self.theme.MAGENTA)
             parts.append(route)
         
-        return " │ ".join(parts)
+        return " | ".join(parts)
     
     def format_response_header(self, response: GenerateResponse) -> str:
         """Format response with modern header design."""
@@ -157,9 +187,9 @@ class ResponseFormatter:
         border_width = max(content_width + 4, min_width)  # +4 for padding and borders
         
         # Create dynamic bordered header
-        top_border = "┌─ Response " + "─" * (border_width - 13) + "┐"
-        content_line = f"│ {metadata_bar:<{border_width - 4}} │"
-        bottom_border = "└" + "─" * (border_width - 2) + "┘"
+        top_border = "+- Response " + "-" * (border_width - 13) + "+"
+        content_line = f"| {metadata_bar:<{border_width - 4}} |"
+        bottom_border = "+" + "-" * (border_width - 2) + "+"
         
         header_lines = [top_border, content_line, bottom_border]
         

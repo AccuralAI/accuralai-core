@@ -11,7 +11,7 @@ def get_default_settings() -> CoreSettings:
     """Return baseline settings that rely on built-in mock components."""
     defaults: Dict[str, Any] = {
         "canonicalizer": {
-            "plugin": "standard",
+            "plugin": "advanced",
             "options": {
                 "prompt_whitespace": True,
                 "normalize_tags": True,
@@ -37,7 +37,32 @@ def get_default_settings() -> CoreSettings:
         ).model_dump(),
         "router": RouterSettings(default_backend="mock").model_dump(),
         "backends": {"mock": BackendSettings(plugin="mock").model_dump()},
-        "validators": [],
+        "validators": [
+            {
+                "plugin": "tool",
+                "options": {
+                    "available_tools": [
+                        "read.file",
+                        "write.file", 
+                        "list.directory",
+                        "search.files",
+                        "grep.text",
+                        "file.info",
+                        "get.working_directory",
+                        "path.exists",
+                        "run.command",
+                        "delete.file",
+                        "copy.file",
+                        "move.file",
+                        "create.directory",
+                        "change.working_directory",
+                        "get.environment_variables"
+                    ],
+                    "provide_feedback": True,
+                    "feedback_message": "I attempted to use a tool that is not available. I am a general purpose AI assistant and can help with a wide variety of topics and tasks. Please provide the answer directly without using tools, or use one of the available tools."
+                }
+            }
+        ],
         "post_processors": [],
         "tools": ToolSettings(
             enabled_by_default=[

@@ -88,10 +88,30 @@ class Pipeline:
             canonical = canonical.model_copy(update={"id": ctx.request.id})
 
         ctx.canonical_request = canonical
+        
+        # Collect canonicalization metrics
+        canonicalize_metrics = {}
+        if hasattr(self._canonicalizer, 'metrics'):
+            metrics = self._canonicalizer.metrics
+            canonicalize_metrics = {
+                "original_token_count": metrics.original_token_count,
+                "optimized_token_count": metrics.optimized_token_count,
+                "tokens_saved": metrics.tokens_saved,
+                "compression_ratio": metrics.compression_ratio,
+                "deduplication_applied": metrics.deduplication_applied,
+                "whitespace_compression_applied": metrics.whitespace_compression_applied,
+                "structure_optimization_applied": metrics.structure_optimization_applied,
+            }
 
         cache_key = self._cache_strategy(canonical)
         cached_response: Optional[GenerateResponse] = None
         cache_latency_ms: Optional[int] = None
+        
+        # Collect initial cache stats
+        cache_stats = {}
+        if self._cache and hasattr(self._cache, 'stats'):
+            cache_stats = self._cache.stats.copy()
+            
         if cache_key and self._cache:
             async def measured_cache_get(key: str, *, request: GenerateRequest) -> GenerateResponse | None:
                 nonlocal cache_latency_ms
@@ -168,6 +188,14 @@ class Pipeline:
         final_response.metadata["response_source"] = response_source
         if cache_key:
             final_response.metadata["cache_key"] = cache_key
+            
+        # Add canonicalization metrics to response metadata
+        if canonicalize_metrics:
+            final_response.metadata["canonicalize_metrics"] = canonicalize_metrics
+            
+        # Add cache metrics to response metadata
+        if cache_stats:
+            final_response.metadata["cache_stats"] = cache_stats
 
         ctx.response = final_response
         return final_response
