@@ -41,13 +41,13 @@ def test_interactive_model_command():
     outputs: List[str] = []
     shell = build_shell(outputs)
 
-    shell.execute_line("/model gemini-1.5-flash")
+    shell.execute_line("/model gemini-2.5-flash-lite")
     shell.execute_line("/model")
     shell.execute_line("/model reset")
 
     assert shell.state.parameters.get("model") is None
     assert "Model set" in outputs[0]
-    assert "gemini-1.5-flash" in outputs[1]
+    assert "gemini-2.5-flash-lite" in outputs[1]
     assert "Cleared model" in outputs[3]
 
 
