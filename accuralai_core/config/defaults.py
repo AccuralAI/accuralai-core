@@ -13,7 +13,7 @@ def get_default_settings() -> CoreSettings:
         "canonicalizer": {
             "plugin": "advanced",
             "options": {
-                "prompt_whitespace": True,
+                "enable_whitespace_compression": False,  # Disabled - preserving whitespace improves response quality
                 "normalize_tags": True,
                 "default_tags": [],
                 "metadata_defaults": {},

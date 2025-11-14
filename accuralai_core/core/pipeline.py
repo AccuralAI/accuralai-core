@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import Callable, Dict, Mapping, Optional, Sequence
 
@@ -29,6 +30,8 @@ from .events import (
 )
 from .instrumentation import instrument_stage
 
+LOGGER = logging.getLogger("accuralai.core")
+
 
 CacheStrategy = Callable[[GenerateRequest], Optional[str]]
 
@@ -44,6 +47,7 @@ class BackendRunner:
         if backend is None:
             msg = f"Backend '{backend_id}' is not registered"
             raise KeyError(msg)
+        LOGGER.debug(f"Invoking backend '{backend_id}' with {len(request.tools) if request.tools else 0} tools")
         return await backend.generate(request, routed_to=backend_id)
 
 
@@ -152,6 +156,7 @@ class Pipeline:
                 self._router.route,
                 canonical,
             )
+            LOGGER.debug(f"Router selected backend: '{backend_id}'")
             await ctx.record_event(ROUTE_SELECTED, {"backend_id": backend_id})
             response = await self._invoke_backend(ctx, backend_id, canonical)
             response = self._ensure_usage_tokens(response, canonical)

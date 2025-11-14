@@ -31,10 +31,10 @@ class LoggingInstrumentation(Instrumentation):
         self._logger = logger or LOGGER
 
     async def on_stage_start(self, stage: str, *, context: Dict[str, Any]) -> None:
-        self._logger.debug("stage start", extra={"stage": stage, "context": context})
+        self._logger.debug(f"stage start: {stage}", extra={"stage": stage, "context": context})
 
     async def on_stage_end(self, stage: str, *, context: Dict[str, Any]) -> None:
-        self._logger.debug("stage end", extra={"stage": stage, "context": context})
+        self._logger.debug(f"stage end: {stage}", extra={"stage": stage, "context": context})
 
     async def on_error(self, stage: str, *, error: Exception, context: Dict[str, Any]) -> None:
         self._logger.exception(
