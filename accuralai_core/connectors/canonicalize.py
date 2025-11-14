@@ -29,8 +29,7 @@ class IdentityCanonicalizer(Canonicalizer):
 
     async def canonicalize(self, request: GenerateRequest) -> GenerateRequest:
         normalized_tags = sorted(set(tag.lower() for tag in request.tags))
-        data = request.model_dump(update={"tags": normalized_tags}, mode="python")
-        return GenerateRequest.model_validate(data)
+        return request.model_copy(update={"tags": normalized_tags})
 
 
 async def build_identity_canonicalizer(**_: object) -> Canonicalizer:
