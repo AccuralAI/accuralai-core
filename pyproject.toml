@@ -23,11 +23,20 @@ ollama = ["accuralai-ollama"]
 google = ["accuralai-google"]
 validators = ["accuralai-validator"]
 cli = ["accuralai-cli"]
+rag = ["accuralai-rag"]
 
 # Convenience groups
 all-backends = ["accuralai-ollama", "accuralai-google"]
 all-plugins = ["accuralai-canonicalize", "accuralai-cache", "accuralai-router", "accuralai-validator"]
-complete = ["accuralai-canonicalize", "accuralai-cache", "accuralai-router", "accuralai-validator", "accuralai-ollama", "accuralai-google"]
+complete = [
+  "accuralai-canonicalize",
+  "accuralai-cache",
+  "accuralai-router",
+  "accuralai-validator",
+  "accuralai-ollama",
+  "accuralai-google",
+  "accuralai-rag",
+]
 
 dev = [
   "pytest",
